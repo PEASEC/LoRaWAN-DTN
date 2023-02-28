@@ -1,17 +1,6 @@
 # ChirpStack GatewayBridge Integration
 
-A small cli tool for sending/receiving data through a ChirpStack-enabled LoRaWAN-Gateway.
-
-## Usage
-The daemon expects a file path to a config file (same config file as [../spatz](Spatz)).
-
-
-### Receiving
-
-
-```
-./ --config-file-path path/to/file
-```
+A library that handles mosquitto based communication with a running ChirpStack, to allow sending (downlink) and receiving (uplink) LoRa(-WAN) packets via a LoRaWAN-Gateway.
 
 ## Acknowledgments
 * This work was created at Science and Technology for Peace and Security (PEASEC), Technical University of Darmstadt, www.peasec.de, and supported by funds of the German Government’s Special Purpose Fund held at Landwirtschaftliche Rentenbank in the projects Geobox-II and AgriRegio.
