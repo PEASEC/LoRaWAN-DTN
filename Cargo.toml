@@ -1,0 +1,10 @@
+[workspace]
+
+members = [
+    "chirpstack_gwb_integration",
+    "chirpstack_gwb_integration_cli",
+    "chirpstack_api_wrapper",
+    "spatz"
+]
+
+resolver = "2"

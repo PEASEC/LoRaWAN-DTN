@@ -1,0 +1,6 @@
+api_token="API_TOKEN"
+tenant_id="TENANT_ID"
+chirpstack_url="http://127.0.0.1"
+chirpstack_port=8080
+mqtt_url="127.0.0.1"
+mqtt_port=1883
