@@ -1,176 +1,289 @@
+//! All errors used in the spatz code.
+
 use chirpstack_gwb_integration::error::{BandwidthConversionError, SpreadingFactorConversionError};
 use nom::error::{FromExternalError, ParseError};
 use nom::ErrorConvert;
 use std::num::{ParseIntError, TryFromIntError};
 use thiserror::Error;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("Message cache error: {0}")]
-    MessageCache(#[from] MessageCacheError),
-    #[error("Protocol parser error: {0}")]
-    ProtocolParser(#[from] ProtocolParserError),
-    #[error("Protocol Creation error: {0}")]
-    ProtocolCreation(#[from] ProtocolCreationError),
-    #[error("Location encoding error: {0}")]
-    LocationEncoding(#[from] LocationEncodingError),
-    #[error("Send buffer error: {0}")]
-    SendBuffer(#[from] SendBufferError),
-    #[error("Receive buffer error: {0}")]
-    ReceiveBuffer(#[from] ReceiveBufferError),
-    #[error("Try from endpoint ID error: {0}")]
-    TryFromEndpointId(#[from] TryFromEndpointIdError),
-    #[error("Bp7 endpoint ID error: {0}")]
-    Bp7Eid(#[from] bp7::eid::EndpointIdError),
-}
-
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum MessageCacheError {
+/// Errors returned by the packet cache.
+#[derive(Error, Debug, Ord, PartialOrd, PartialEq, Eq)]
+pub enum PacketCacheError {
+    /// Entry has not timed out yet
     #[error("Entry has not timed out yet")]
     NotTimedOut,
 }
 
+/// Errors returned by the protocol parser.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum ProtocolParserError {
-    #[error("Payload has no proprietary tag.")]
+    /// Payload has no proprietary tag.
+    #[error("Payload has no proprietary tag")]
     NoProprietaryTag,
-    #[error("Payload has wrong version tag.")]
+    /// Payload has wrong version tag.
+    #[error("Payload has wrong version tag")]
     WrongVersionTag,
-    #[error("Payload has unknown message type.")]
-    UnknownMsgType,
-    #[error("The index of the fragment is bigger than the total number of fragments")]
-    FragmentIndexBiggerThanTotal,
+    /// Payload has unknown packet type.
+    #[error("Payload has unknown packet type")]
+    UnknownPacketType,
+    /// Nom error.
     #[error("Nom encountered an error: {0:?}")]
     Nom(nom::error::ErrorKind),
+    /// Did not receive three bytes, cannot convert to u32
     #[error("Did not receive three bytes, cannot convert to u32")]
     NotThreeBytes,
+    /// Failed to create naive datetime from timestamp.
     #[error("Failed to create naive datetime from timestamp")]
     FromTimestampError,
 }
 
+/// Errors occurring when creating a complete bundle packet.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum ProtocolCreationError {
-    #[error("Fragment index was larger than (2^7)-1")]
-    FragmentIndexTooLarge,
-    #[error("Fragment total amount was larger than (2^7)")]
-    FragmentTotalAmountTooLarge,
+pub enum CompleteBundleCreationError {
+    /// The payload is too large and cannot fit into one packet.
+    #[error("The payload is too large and cannot fit into one packet")]
+    PayloadTooLarge,
 }
 
+/// Errors occurring when creating a bundle fragment packet.
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum BundleFragmentCreationError {
+    /// The provided payload cannot fill the packet payload completely, this is forbidden for all
+    /// but end packets.
+    #[error(
+        "The provided payload cannot fill the packet payload completely, this is forbidden for all
+        but end packets"
+    )]
+    PayloadNotFilledCompletely,
+    /// Payload is empty.
+    #[error("Payload is empty")]
+    PayloadEmpty,
+}
+
+/// Errors occurring when encoding a location.
 #[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum LocationEncodingError {
+    /// Could not encode value, was out of range (-90.00 to 90.00).
     #[error("Could not encode value, was out of range (-90.00 to 90.00)")]
     LatOutOfRange,
+    /// Could not encode value, was out of range (-180.00 to 180.00)
     #[error("Could not encode value, was out of range (-180.00 to 180.00)")]
     LongOutOfRange,
+    /// Could not encode value, was out of range (-83886.00 to 83886.00)
     #[error("Could not encode value, was out of range (-83886.00 to 83886.00)")]
     AltOutOfRange,
 }
 
-#[derive(Error, Debug)]
+/// Errors occurring when using the send buffer.
+#[derive(Error, Debug, Ord, PartialOrd, PartialEq, Eq)]
 pub enum SendBufferError {
-    #[error("There are not enough bytes per fragment to send this packet")]
-    NotEnoughBytesPerFragment,
-    #[error("There are not enough bytes per fragment to send at least one payload part")]
-    NotEnoughBytesPerFragmentForOnePayload,
-    #[error("All already fragments retrieved")]
-    NoRemainingFragments,
-    #[error("Too many canonical blocks, only one is supported")]
-    TooManyCanonicals,
-    #[error("The canonical block contains no data")]
-    NoDataCanonical,
-    #[error("The payload is too big and cannot be sent with selected data rate")]
-    PayloadTooBig,
-    #[error("Endpoint conversion error: ")]
-    EndpointConversion(#[from] TryFromEndpointIdError),
-    #[error("Protocol creation error: ")]
-    ProtocolCreation(#[from] ProtocolCreationError),
-    #[error("Payload was empty")]
-    EmptyPayload,
-    #[error("Fragment count calculation is wrong, payload returned None")]
-    FragmentCountCalculationWrong,
-    #[error("Failed to create naive datetime from timestamp")]
-    FromTimestampError,
-    #[error("Message cache error: ")]
-    MessageCacheError(#[from] MessageCacheError),
+    /// The payload was already consumed completely.
+    #[error("The payload was already consumed completely")]
+    PayloadConsumed,
 }
 
-#[allow(missing_docs)]
+/// Errors occurring when calculating the airtime of a downlink.
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum AirtimeCalculationError {
+    /// No downlink items.
     #[error("No downlink items")]
     NoItems,
+    /// Data extraction error.
     #[error("Data extraction error: {0}")]
-    DataRateExtraction(#[from] LoRaModulationExtrationError),
+    DataRateExtraction(#[from] LoRaModulationExtractionError),
+    /// Failed to convert integer.
     #[error("Failed to convert integer: {0}")]
     NumberConversion(#[from] TryFromIntError),
+    /// Failed to convert bandwidth.
     #[error("Failed to convert bandwidth: {0}")]
     BandWidthConversion(#[from] BandwidthConversionError),
+    /// Failed to convert spreading factor.
     #[error("Failed to convert spreading factor: {0}")]
     SpreadingFactorConversion(#[from] SpreadingFactorConversionError),
 }
 
+/// Errors occurring when creating a bundle send buffer.
 #[derive(Error, Debug)]
-pub enum SendManagerError {
+pub enum BundleSendBufferCreationError {
+    /// The payload is too large and cannot be sent completely with the lowest data rate.
+    #[error("The payload is too large and cannot be sent completely with the lowest data rate")]
+    PayloadTooLarge,
+}
+
+/// Errors occurring when creating a sub band.
+#[derive(Error, Debug, Ord, PartialOrd, PartialEq, Eq)]
+pub enum SubBandCreationError {
+    /// No matching sub band for frequency.
+    #[error("No matching sub band for frequency: {freq}")]
+    NoMatchingSubBand {
+        /// The provided frequency that could not be matched to a sub band.
+        freq: u32,
+    },
+}
+
+/// Errors occurring when creating a sub band.
+#[derive(Error, Debug, Ord, PartialOrd, PartialEq, Eq)]
+pub enum NextPacketFromSendBufferError {
+    /// SendBuffer does not contain any more fragments.
     #[error("SendBuffer does not contain any more fragments")]
     NoRemainingFragments,
+    /// No SendBuffer in SendBuffer queue.
     #[error("No SendBuffer in SendBuffer queue")]
     NoSendBufferInQueue,
-    #[error(transparent)]
-    SendBufferError(#[from] SendBufferError),
+    /// Packet cache error.
+    #[error("Packet cache error: {0}")]
+    PacketCache(#[from] PacketCacheError),
+    /// Send buffer error
+    #[error("Send buffer error: {0}")]
+    SendBuffer(#[from] SendBufferError),
 }
 
-#[derive(Error, Debug)]
-pub enum SubBandError {
-    #[error("No matching sub band for frequency: {freq}")]
-    NoMatchingSubBand { freq: u32 },
-}
-
-#[derive(Error, Debug)]
-pub enum DutyCycleManagerError {
+/// Errors occurring when consuming duty cycle time.
+#[derive(Error, Debug, Ord, PartialOrd, PartialEq, Eq)]
+pub enum ConsumeDutyCycleTimeError {
+    /// More capacity used than was available.
     #[error("More capacity used than was available")]
-    CapacityOverused ,
-    #[error(transparent)]
-    SubBand(#[from] SubBandError),
+    CapacityOverused,
+    /// Sub band error.
+    #[error("Sub band error: {0}")]
+    SubBand(#[from] SubBandCreationError),
 }
 
+/// Errors occurring when trying to convert a [`EndDeviceId`](crate::EndDeviceId) into a [`bp7::EndpointID`].
 #[derive(Error, Debug)]
-pub enum TryFromEndpointIdError {
-    #[error("Only Dtn addressing is supported")]
+pub enum TryFromEndDeviceId {
+    /// Not a Dtn address, only Dtn addressing is supported.
+    #[error("Not a Dtn address, only Dtn addressing is supported")]
     NoDtnAddress,
+    /// Error parsing int.
     #[error("Error parsing int: {0}")]
     ParseInt(#[from] ParseIntError),
-    #[error("Endpoint id error from bp7: {0}")]
+}
+
+/// Errors occurring when processing a packet.
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum BundleReceiveBufferProcessError {
+    /// Packets destination does not match receive buffers destination.
+    #[error("Packets destination does not match receive buffers destination")]
+    DstDoesNotMatch,
+    /// Packets source does not match receive buffers source.
+    #[error("Packets source does not match receive buffers source")]
+    SrcDoesNotMatch,
+    /// Packets timestamp does not match receive buffers timestamp.
+    #[error("Packets timestamp does not match receive buffers timestamp")]
+    TimestampDoesNotMatch,
+    /// Packets fragment offset hash does not match receive buffers fragment offset hash.
+    #[error("Packets fragment offset hash does not match receive buffers fragment offset hash")]
+    FragmentOffsetHashDoesNotMatch,
+    /// A packet with this index has already been received.
+    #[error("A packet with this index has already been received")]
+    IndexAlreadyReceived,
+    /// A packet with an end index has already been received.
+    #[error("A packet with an end index has already been received")]
+    EndIndexAlreadyReceived,
+    /// Fragmented bundle fragment end packet has no TADUL.
+    #[error("Fragmented bundle fragment end packet has no TADUL")]
+    NoTadul,
+    /// Fragmented bundle fragment end packet has no fragment offset.
+    #[error("Fragmented bundle fragment end packet has no fragment offset")]
+    NoFragmentOffset,
+}
+
+/// Errors occurring when trying to create a [`BundleSendBuffer`](crate::send_buffers::BundleSendBuffer) from a [`bp7::Bundle`].
+#[derive(Error, Debug)]
+pub enum BundleSendBufferConversionError {
+    /// Bundle has no payload.
+    #[error("Bundle has no payload")]
+    NoPayload,
+    /// Failed to create naive datetime from timestamp.
+    #[error("Failed to create naive datetime from timestamp")]
+    TryFromTimestampError,
+    /// Endpoint conversion error.
+    #[error("Endpoint conversion error: {0}")]
+    TryFromEndpointId(#[from] TryFromEndDeviceId),
+    /// Bundle send buffer creation error.
+    #[error("Bundle send buffer creation error: ")]
+    BundleSendBuffer(#[from] BundleSendBufferCreationError),
+}
+
+/// Errors occurring when combining the fragments in a [`BundleReceiveBuffer`](crate::receive_buffers::BundleReceiveBuffer).
+#[derive(Error, Debug)]
+pub enum BundleReceiveBufferCombineError {
+    /// No packet indicating the end has been received.
+    #[error("No packet indicating the end has been received")]
+    EndNotReceived,
+    /// Not all fragments have been received.
+    #[error("Not all fragments have been received")]
+    FragmentsMissing,
+    /// Endpoint ID error from bp7.
+    #[error("Endpoint ID error from bp7: {0}")]
     EndpointId(#[from] bp7::eid::EndpointIdError),
+    /// Primary builder error from bp7.
     #[error("Primary builder error from bp7: {0}")]
     PrimaryBuilder(#[from] bp7::primary::PrimaryBuilderError),
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum ReceiveBufferError {
-    #[error("A frame with this index has already been received")]
-    IndexAlreadyReceived,
-    #[error("Payload was not a fragment")]
-    NoFragment,
-    #[error("Not all fragments have been received")]
-    FragmentsMissing,
-    #[error(
-        "The total fragment amount of the fragment does not match previously received fragments"
-    )]
-    FragmentAmountDoesNotMatch,
+/// Errors occurring when extracting the [`LoraModulationInfo`](chirpstack_api::gw::LoraModulationInfo).
+#[derive(Error, Debug, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
+pub enum LoRaModulationExtractionError {
+    /// No TX info in frame.
+    #[error("No TX info in frame")]
+    NoTxInfo,
+    /// No modulation info in frame.
+    #[error("No modulation info in frame")]
+    NoModulationInfo,
+    /// No LoRa parameters in modulation in frame.
+    #[error("No LoRa parameters in modulation in frame")]
+    NoLoRaParameters,
 }
 
-#[allow(missing_docs)]
+/// Errors occurring when creating a [`Hop2HopReceiveBuffer`](crate::receive_buffers::Hop2HopReceiveBuffer).
 #[derive(Error, Debug, PartialEq, Eq)]
-pub enum LoRaModulationExtrationError {
-    #[error("Wrong parameters: {0}")]
-    WrongParameters(#[from] chirpstack_gwb_integration::error::DataRateConversionError),
-    #[error("No TX info in uplink frame")]
-    NoTxInfo,
-    #[error("No modulation info in uplink frame")]
-    NoModulationInfo,
-    #[error("No LoRa parameters in modulation in uplink frame")]
-    NoLoRaParameters,
+pub enum Hop2HopReceiveBufferCreationError {
+    /// Fragment index is larger than total amount of fragments
+    #[error("Fragment index is larger than total amount of fragments")]
+    IndexLargerThanTotal,
+}
+
+/// Errors occurring when processing a Hop2Hop packet fragment.
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum Hop2HopReceiveBufferProcessPacketError {
+    /// The fragments packet hash does not match.
+    #[error("The fragments packet hash does not match")]
+    HashMismatch,
+    /// The fragments packet total fragment amount does not match.
+    #[error("The fragments packet total fragment amount does not match")]
+    TotalFragmentsMismatch,
+    /// Fragment index is larger than total amount of fragments.
+    #[error("Fragment index is larger than total amount of fragments")]
+    IndexLargerThanTotal,
+    /// A packet with this index has already been received.
+    #[error("A packet with this index has already been received")]
+    IndexAlreadyReceived,
+}
+
+/// Errors occurring when combining the fragments in a [`Hop2HopReceiveBuffer`](crate::receive_buffers::Hop2HopReceiveBuffer).
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum Hop2HopReceiveBufferCombineError {
+    /// Not all fragment received.
+    #[error("Not all fragments received")]
+    FragmentsMissing,
+    /// Protocol parser error.
+    #[error("Protocol parser error: {0}")]
+    ProtocolParser(#[from] ProtocolParserError),
+}
+
+/// Errors occurring when interacting with the database.
+#[derive(Error, Debug)]
+pub enum DbError {
+    /// Serde_json error
+    #[error("Deserializing error from serde_json: {0}")]
+    SerdeJson(#[from] serde_json::Error),
+    /// Sqlx error
+    #[error("Database error form sqlx: {0}")]
+    Sqlx(#[from] sqlx::Error),
 }
 
 impl ErrorConvert<ProtocolParserError> for ProtocolParserError {
@@ -195,4 +308,5 @@ impl FromExternalError<&[u8], ProtocolParserError> for ProtocolParserError {
     }
 }
 
+/// Type alias for packet parsing.
 pub type IResult<I, O> = nom::IResult<I, O, ProtocolParserError>;

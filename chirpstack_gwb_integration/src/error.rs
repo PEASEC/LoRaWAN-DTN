@@ -4,10 +4,11 @@ use uuid::Uuid;
 
 /// All errors this crate can return.
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Downlink error: {0}")]
-    Downlink(#[from] DownlinkError),
+    Downlink(#[from] DownlinkItemBuilderError),
     #[error("Uuid collision, this is extremely unlikely. Try again if you encounter this error.")]
     UuidCollision,
     #[error("Config error: {0}")]
@@ -38,18 +39,18 @@ pub enum Error {
     DataRateConversion(#[from] DataRateConversionError),
 }
 
-/// Errors occuring when handling callbacks.
+/// Errors occuring when removing callbacks.
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum CallbackError {
-    #[error("Prost decode error: {0}")]
-    ProstDecode(#[from] prost::DecodeError),
+pub enum CallbackRemoveError {
     #[error("No callback found for Uuid: {uuid}")]
     NoSuchCallback { uuid: Uuid },
 }
 
 /// Errors occurring while parsing MQTT topic strings.
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum TopicParsingError {
     #[error("Could not parse LoRaWanRegion: {was}")]
@@ -72,6 +73,7 @@ pub enum TopicParsingError {
 
 /// Errors returned by the runtime.
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Error, Debug)]
 pub enum RuntimeError {
     #[error("Already subscribed to topic: {topic}")]
@@ -80,26 +82,39 @@ pub enum RuntimeError {
     NotSubscribed { topic: String },
     #[error("Gateway not found: {gateway_id}")]
     NoSuchGateway { gateway_id: String },
-    #[error("Callback error: {0}")]
-    Callback(#[from] CallbackError),
+    #[error("Callback remove error: {0}")]
+    CallbackRemove(#[from] CallbackRemoveError),
     #[error("Uuid collision, this is extremely unlikely. Try again if you encounter this error.")]
     UuidCollision,
+    #[error("Runtime is stopped")]
+    Stopped,
     #[error("Rumqttc client error: {0}")]
     RumqttcClient(#[from] rumqttc::ClientError),
 }
 
-/// Errors occurring when creating downlinks.
+/// Errors occurring when creating downlink items.
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum DownlinkError {
+pub enum DownlinkItemBuilderError {
     #[error("Missing parameter: {missing}")]
     MissingParameter { missing: String },
     #[error("Payload is too big, over limit by: {over_limit}")]
     PayloadTooBig { over_limit: usize },
 }
 
+/// Errors occurring when creating downlinks.
+#[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum DownlinkBuilderError {
+    #[error("Missing parameter: {missing}")]
+    MissingParameter { missing: String },
+}
+
 /// Errors occurring when converting from bandwidth and spreading factor to data rate.
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum DataRateConversionError {
     #[error("Parameters do not match any data rate, bandwidth: {bandwidth} spreading_factor: {spreading_factor}")]
@@ -111,6 +126,7 @@ pub enum DataRateConversionError {
 
 /// Errors occurring when converting an integer to a [`SpreadingFactor`](crate::downlinks::predefined_parameters::SpreadingFactor).
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum SpreadingFactorConversionError {
     #[error("Parameter does not match any spreading factor: {spreading_factor}")]
@@ -119,6 +135,7 @@ pub enum SpreadingFactorConversionError {
 
 /// Errors occurring when converting from integer to a [`Bandwidth`](crate::downlinks::predefined_parameters::Bandwidth).
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum BandwidthConversionError {
     #[error("Parameter does not match any bandwidth: {bandwidth}")]

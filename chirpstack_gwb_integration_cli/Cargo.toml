@@ -11,15 +11,15 @@ description = "Send and receive LoRa frames via a Gateway. Needs a working Chirp
 async-trait = "0.1"
 clap = { version = "4.0.4", features = ["derive"] }
 chirpstack_gwb_integration = { path = "../chirpstack_gwb_integration" }
-chirpstack_api = "4.1.1"
+chirpstack_api = "4.4.0"
 chirpstack_api_wrapper = { path ="../chirpstack_api_wrapper"}
 chrono = "0.4.19"
 rand = "0.8.5"
-rumqttc = "0.18.0"
+rumqttc = "0.20.0"
 serde = "1.0.139"
 serde_derive = "1.0.139"
 tokio = {version = "1.19", features = ["full"]}
-toml = "0.5.9"
+toml = "0.7.2"
 tracing = "0.1"
 tracing-subscriber = {version = "0.3.15", features = ["env-filter"]}
 uuid = {version = "1.1", features = ["v4"]}

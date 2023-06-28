@@ -1,18 +1,26 @@
 //! Builders to create correct downlinks.
 
-use crate::downlinks::{Downlink, DownlinkItem};
-use crate::error::DownlinkError;
+use crate::downlinks::{Downlink, DownlinkItem, DownlinkType};
+use crate::error::DownlinkBuilderError;
 
-/// Populate with data and build a [`Downlink`].
+/// Builder for [`Downlink`].
 #[derive(Debug, Clone)]
-pub struct DownlinkBuilder<DownlinkType> {
+pub struct DownlinkBuilder<Dt>
+where
+    Dt: DownlinkType,
+{
+    /// Gateway ID.
     gateway_id: Option<String>,
     /// In the ChirpStack source, this is set by `rand::thread_rng().gen()`.
     downlink_id: Option<u32>,
-    items: Option<Vec<DownlinkItem<DownlinkType>>>,
+    /// Downlink items.
+    items: Option<Vec<DownlinkItem<Dt>>>,
 }
 
-impl<DownlinkType> Default for DownlinkBuilder<DownlinkType> {
+impl<Dt> Default for DownlinkBuilder<Dt>
+where
+    Dt: DownlinkType,
+{
     fn default() -> Self {
         Self {
             gateway_id: None,
@@ -22,26 +30,30 @@ impl<DownlinkType> Default for DownlinkBuilder<DownlinkType> {
     }
 }
 
-impl<DownlinkType> DownlinkBuilder<DownlinkType> {
-    /// Create a new [`DownlinkBuilder`].
+impl<Dt> DownlinkBuilder<Dt>
+where
+    Dt: DownlinkType,
+{
+    /// Creates a new [`DownlinkBuilder`].
+    #[must_use]
     pub fn new() -> Self {
         DownlinkBuilder::default()
     }
 
-    /// Set the gateway id
-    pub fn gateway_id(mut self, gateway_id: String) -> DownlinkBuilder<DownlinkType> {
+    /// Sets the gateway id
+    pub fn gateway_id(&mut self, gateway_id: String) -> &mut Self {
         self.gateway_id = Some(gateway_id);
         self
     }
 
-    /// Set downlink id ([`uuid`]).
-    pub fn downlink_id(mut self, downlink_id: u32) -> DownlinkBuilder<DownlinkType> {
+    /// Sets downlink id ([`uuid`]).
+    pub fn downlink_id(&mut self, downlink_id: u32) -> &mut Self {
         self.downlink_id = Some(downlink_id);
         self
     }
 
-    /// Add a single item to the items list.
-    pub fn add_item(mut self, item: DownlinkItem<DownlinkType>) -> DownlinkBuilder<DownlinkType> {
+    /// Adds a single item to the items list.
+    pub fn add_item(&mut self, item: DownlinkItem<Dt>) -> &mut Self {
         if self.items.is_none() {
             self.items = Some(Vec::with_capacity(1));
         }
@@ -52,11 +64,8 @@ impl<DownlinkType> DownlinkBuilder<DownlinkType> {
         self
     }
 
-    /// Add multiple items to the item list.
-    pub fn add_items(
-        mut self,
-        mut items: Vec<DownlinkItem<DownlinkType>>,
-    ) -> DownlinkBuilder<DownlinkType> {
+    /// Adds multiple items to the item list.
+    pub fn add_items(&mut self, mut items: Vec<DownlinkItem<Dt>>) -> &mut Self {
         if self.items.is_none() {
             self.items = Some(Vec::with_capacity(items.len()));
         }
@@ -68,19 +77,23 @@ impl<DownlinkType> DownlinkBuilder<DownlinkType> {
     }
 
     /// Builds the [`Downlink`].
-    pub fn build(self) -> Result<Downlink<DownlinkType>, DownlinkError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a required parameter is missing.
+    pub fn build(&mut self) -> Result<Downlink<Dt>, DownlinkBuilderError> {
         if self.items.is_none() {
-            return Err(DownlinkError::MissingParameter {
+            return Err(DownlinkBuilderError::MissingParameter {
                 missing: "items".to_owned(),
             });
         }
         if self.downlink_id.is_none() {
-            return Err(DownlinkError::MissingParameter {
+            return Err(DownlinkBuilderError::MissingParameter {
                 missing: "downlink_id".to_owned(),
             });
         }
         if self.gateway_id.is_none() {
-            return Err(DownlinkError::MissingParameter {
+            return Err(DownlinkBuilderError::MissingParameter {
                 missing: "gateway_id".to_owned(),
             });
         }
@@ -88,12 +101,14 @@ impl<DownlinkType> DownlinkBuilder<DownlinkType> {
         Ok(Downlink {
             gateway_id: self
                 .gateway_id
+                .clone()
                 .expect("This can't happen, variable is checked for None before."),
             downlink_id: self
                 .downlink_id
                 .expect("This can't happen, variable is checked for None before."),
             items: self
                 .items
+                .clone()
                 .expect("This can't happen, variable is checked for None before."),
         })
     }

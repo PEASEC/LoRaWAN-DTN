@@ -3,23 +3,35 @@
 use crate::gateway_topics::ParsedTopic;
 use crate::runtime::callbacks::{AllGatewaysCallbackStorage, PerGatewayCallbackStorage};
 use prost::Message;
-use rumqttc::{EventLoop, Incoming, Publish};
+use rumqttc::{Event, EventLoop, Incoming, Publish};
+use std::time::Duration;
+use tokio::time::Instant;
 #[cfg(debug_assertions)]
 use tracing::debug;
 use tracing::{error, trace};
 
-/// Runs the event loop processing incoming MQTT messages. Needs to be spawned in an async task and
-/// kept running continuously.
+/// Runs the event loop processing incoming MQTT messages.
+///
+/// Needs to be spawned in an async task and kept running continuously.
 #[tracing::instrument(skip_all)]
 pub(crate) async fn run_event_loop(
     mut event_loop: EventLoop,
     per_gateway_callbacks: PerGatewayCallbackStorage,
     all_gateways_callbacks: AllGatewaysCallbackStorage,
+    connection_error_sender: Option<tokio::sync::broadcast::Sender<String>>,
+    mut stop_signal_rx: tokio::sync::mpsc::Receiver<()>,
 ) {
+    let mut error_counter = 0;
+    let mut last_error = Instant::now();
     loop {
-        match event_loop.poll().await {
+        let notification = tokio::select! {
+            _ = stop_signal_rx.recv() => {return},
+            notification = event_loop.poll() => {notification}
+        };
+
+        match notification {
             Ok(notification) => {
-                if let rumqttc::Event::Incoming(Incoming::Publish(pub_msg)) = notification {
+                if let Event::Incoming(Incoming::Publish(pub_msg)) = notification {
                     trace!("Incoming msg Publish: {:?}", pub_msg);
 
                     #[cfg(debug_assertions)]
@@ -62,15 +74,35 @@ pub(crate) async fn run_event_loop(
             Err(e) => {
                 // The event loop tries to reconnect on it's own.
                 // Connection error handling goes here if required.
-                //TODO prevent flooding the log with error messages.
 
                 error!(%e);
+
+                // If the last error happened over 30 seconds ago, reset error timer, otherwise
+                // increase error counter.
+                if Instant::now().duration_since(last_error) > Duration::from_secs(30) {
+                    last_error = Instant::now();
+                    error_counter = 1;
+                } else {
+                    error_counter += 1;
+                }
+
+                if error_counter >= 3 {
+                    if let Some(connection_error_sender) = &connection_error_sender {
+                        if connection_error_sender.receiver_count() > 0 {
+                            if let Err(e) = connection_error_sender.send(e.to_string()) {
+                                error!(%e);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-/// Prints every published message received by the client. Only included in debug builds.
+/// Prints every published message received by the client.
+///
+/// Only included in debug builds.
 #[cfg(debug_assertions)]
 fn debug_printing(pub_msg: &Publish) {
     {

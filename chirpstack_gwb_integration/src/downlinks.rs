@@ -4,70 +4,139 @@ pub mod downlink_builder;
 pub mod downlink_item_builder;
 pub mod predefined_parameters;
 
+use std::fmt::Debug;
+use std::hash::Hash;
 use std::marker::PhantomData;
 
 /// A downlink to be sent. Multiple items may be specified, only one will be sent. Priority
 /// is descending from first to last item.
-#[derive(Debug, Clone)]
-pub struct Downlink<DownlinkType> {
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Downlink<Dt>
+where
+    Dt: DownlinkType,
+{
+    /// Gateway ID.
     gateway_id: String,
+    /// Downlink ID.
     downlink_id: u32,
-    items: Vec<DownlinkItem<DownlinkType>>,
+    /// Items in the Downlink, only one will be sent. Priority is descending from first to last item.
+    items: Vec<DownlinkItem<Dt>>,
 }
 
 /// A single downlink to be sent.
-#[derive(Debug, Clone)]
-pub struct DownlinkItem<DownlinkType> {
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct DownlinkItem<Dt>
+where
+    Dt: DownlinkType,
+{
+    /// Physical payload.
     phy_payload: Vec<u8>,
-    tx_info: TxInfo<DownlinkType>,
+    /// Transmission info.
+    tx_info: TxInfo<Dt>,
 }
 
-/// Part of a [`DownlinkItem`].
-#[derive(Debug, Clone)]
-struct TxInfo<DownlinkType> {
+/// Transmission info.
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+struct TxInfo<Dt>
+where
+    Dt: DownlinkType,
+{
+    /// Frequency in Hz.
     frequency: u32,
+    /// Power in dBm.
     power: i32,
+    /// LoRa modulation info.
     lo_ra_modulation_info: LoRaModulationInfo,
+    /// The board identifier for emitting the frame.
+    ///
+    /// (From <https://docs.rs/chirpstack_api/4.1.1/chirpstack_api/gw/struct.DownlinkTxInfo.html>)
     board: u32,
+    /// The antenna identifier for emitting the frame.
+    ///
+    /// (From <https://docs.rs/chirpstack_api/4.1.1/chirpstack_api/gw/struct.DownlinkTxInfo.html>)
     antenna: u32,
+    /// Delay (duration). The delay will be added to the gateway internal timing, provided by the context object.
+    ///
+    /// (From <https://docs.rs/chirpstack_api/4.1.1/chirpstack_api/gw/struct.DelayTimingInfo.html>)
     delay_timing_info: Option<DelayTimingInfo>,
+    /// Gateway specific context. In case of a Class-A downlink, this contains a copy of the uplink context.
+    ///
+    /// (From <https://docs.rs/chirpstack_api/4.1.1/chirpstack_api/gw/struct.DownlinkTxInfo.html>)
     context: Option<Vec<u8>>,
+    /// Duration since GPS Epoch.
+    ///
+    /// (From <https://docs.rs/chirpstack_api/4.1.1/chirpstack_api/gw/struct.GpsEpochTimingInfo.html>)
     gps_epoch_timing_info: Option<GpsEpochTimingInfo>,
-    downlink_type: PhantomData<DownlinkType>,
+    /// The type of downlink, see [`DownlinkType`].
+    downlink_type: PhantomData<Dt>,
 }
 
-/// Part of a [`DownlinkItem`].
-#[derive(Debug, Clone)]
+/// LoRa modulation info.
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 struct LoRaModulationInfo {
+    /// Bandwidth.
     bandwidth: u32,
+    /// Spreading factor.
     spreading_factor: u32,
+    /// Code rate.
     code_rate: chirpstack_api::gw::CodeRate,
+    /// Polarization inversion, true for downlinks, false for uplinks.
+    ///
+    /// Set to false if gateways should receive the downlink.
     polarization_inversion: bool,
 }
 
-/// Part of a [`DownlinkItem`].
-#[derive(Debug, Clone)]
+/// Delay (duration). The delay will be added to the gateway internal timing, provided by the context object.
+///
+/// (From <https://docs.rs/chirpstack_api/4.1.1/chirpstack_api/gw/struct.DelayTimingInfo.html>)
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 struct DelayTimingInfo {
+    /// Delay
     delay: std::time::Duration,
 }
 
-/// Part of a [`DownlinkItem`].
-#[derive(Debug, Clone)]
+/// Duration since GPS Epoch.
+///
+/// (From <https://docs.rs/chirpstack_api/4.1.1/chirpstack_api/gw/struct.GpsEpochTimingInfo.html>)
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 struct GpsEpochTimingInfo {
+    /// Time since GPS epoch.
     time_since_gps_epoch: std::time::Duration,
 }
 
-/// Marker struct for [`DownlinkBuilder`], [`DownlinkItemBuilder`], [`Downlink`] and [`DownlinkItem`].
-#[derive(Debug, Clone)]
-pub struct DelayTimingClassA;
-/// Marker struct for [`DownlinkBuilder`], [`DownlinkItemBuilder`], [`Downlink`] and [`DownlinkItem`].
-#[derive(Debug, Clone)]
-pub struct GpsTimingClassB;
-/// Marker struct for [`DownlinkBuilder`], [`DownlinkItemBuilder`], [`Downlink`] and [`DownlinkItem`].
-#[derive(Debug, Clone)]
-pub struct ImmediatelyClassC;
+mod sealed {
+    //! Seals the trait inside. Prevents users of the crate to implement traits which require
+    //! [`Sealed`].
+    //!
+    use crate::downlinks::{DelayTimingClassA, GpsTimingClassB, ImmediatelyClassC};
 
-/// Populate [ModulationInfo](chirpstack_api::gw::downlink_tx_info::ModulationInfo) with data.
+    /// Ensures [`DownlinkType`] cannot be implemented outside of this crate.
+    pub trait Sealed {}
+    impl Sealed for DelayTimingClassA {}
+    impl Sealed for GpsTimingClassB {}
+    impl Sealed for ImmediatelyClassC {}
+}
+
+/// Marker trait for different types of downlinks.
+pub trait DownlinkType: sealed::Sealed + Clone + Debug {}
+
+/// Marker struct for [`DownlinkBuilder`], [`DownlinkItemBuilder`], [`Downlink`] and [`DownlinkItem`].
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct DelayTimingClassA;
+impl DownlinkType for DelayTimingClassA {}
+
+/// Marker struct for [`DownlinkBuilder`], [`DownlinkItemBuilder`], [`Downlink`] and [`DownlinkItem`].
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct GpsTimingClassB;
+impl DownlinkType for GpsTimingClassB {}
+
+/// Marker struct for [`DownlinkBuilder`], [`DownlinkItemBuilder`], [`Downlink`] and [`DownlinkItem`].
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct ImmediatelyClassC;
+impl DownlinkType for ImmediatelyClassC {}
+
+/// Build [`ModulationInfo`](chirpstack_api::gw::downlink_tx_info::ModulationInfo) from
+/// [`LoRaModulationInfo`].
 fn build_modulation_info(
     modulation_info: &LoRaModulationInfo,
     polarization_inversion: bool,
@@ -286,14 +355,14 @@ mod tests {
             .expect("Failed to build downlink");
         let protobuf_downlink: chirpstack_api::gw::DownlinkFrame = downlink.into();
         let mut expected_protobuf_tx_info = chirpstack_api::gw::DownlinkTxInfo {
-            frequency: 868100000,
+            frequency: 868_100_000,
             power,
             board,
             antenna,
             ..chirpstack_api::gw::DownlinkTxInfo::default()
         };
         let mut modulation_info_result = chirpstack_api::gw::LoraModulationInfo {
-            bandwidth: 125000,
+            bandwidth: 125_000,
             spreading_factor: 12,
             polarization_inversion: false,
             ..Default::default()
@@ -362,14 +431,14 @@ mod tests {
             .expect("Failed to build downlink");
         let protobuf_downlink: chirpstack_api::gw::DownlinkFrame = downlink.into();
         let mut expected_protobuf_tx_info = chirpstack_api::gw::DownlinkTxInfo {
-            frequency: 868100000,
+            frequency: 868_100_000,
             power,
             board,
             antenna,
             ..chirpstack_api::gw::DownlinkTxInfo::default()
         };
         let mut modulation_info_result = chirpstack_api::gw::LoraModulationInfo {
-            bandwidth: 125000,
+            bandwidth: 125_000,
             spreading_factor: 12,
             polarization_inversion: false,
             ..Default::default()
@@ -436,14 +505,14 @@ mod tests {
             .expect("Failed to build downlink");
         let protobuf_downlink: chirpstack_api::gw::DownlinkFrame = downlink.into();
         let mut expected_protobuf_tx_info = chirpstack_api::gw::DownlinkTxInfo {
-            frequency: 868100000,
+            frequency: 868_100_000,
             power,
             board,
             antenna,
             ..chirpstack_api::gw::DownlinkTxInfo::default()
         };
         let mut modulation_info_result = chirpstack_api::gw::LoraModulationInfo {
-            bandwidth: 125000,
+            bandwidth: 125_000,
             spreading_factor: 12,
             polarization_inversion: false,
             ..Default::default()

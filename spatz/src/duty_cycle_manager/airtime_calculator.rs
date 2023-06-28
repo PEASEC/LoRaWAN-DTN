@@ -7,8 +7,9 @@ use chirpstack_api::gw::LoraModulationInfo;
 use chirpstack_gwb_integration::downlinks::predefined_parameters::{
     Bandwidth, CodingRate, SpreadingFactor,
 };
-
+/// Amount of symbols in the preamble for the EU868-870 bands.
 static LORA_PREAMBLE_LENGTH_EU868_870_IN_SYMBOLS: f64 = 8.0;
+/// Amount of symbols in the sync word for LoRa.
 static LORA_SYNC_WORD_LENGTH_IN_SYMBOLS: f64 = 4.25;
 
 /// T_sym as described in chapter 4 "Semtech AN1200.13 LoRa Modem Designer's Guide"
@@ -29,6 +30,8 @@ fn preamble_duration(
 /// payloadSymbNb as described in chapter 4 "Semtech AN1200.13 LoRa Modem Designer's Guide"
 /// If `is_uplink` is `true`, the payload crc is included, if not, it is removed.
 /// The 16 bits from the equation are assumed to be the payload crc part.
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
 fn payload_symbols(
     phy_payload_len_bytes: u32,
     spreading_factor: SpreadingFactor,
@@ -42,7 +45,8 @@ fn payload_symbols(
     let header_disabled = f64::from(u32::from(header_disabled));
     let data_rate_optimization_enabled = f64::from(u32::from(data_rate_optimization_enabled));
     let coding_rate = coding_rate.value_for_airtime_cal();
-    let is_uplink = f64::from(is_uplink as u32);
+    let is_uplink = f64::from(u32::from(is_uplink));
+
     ((((8.0 * phy_payload_len_bytes - 4.0 * spreading_factor + 28.0 + (16.0 * is_uplink)
         - 20.0 * header_disabled)
         / (4.0 * (spreading_factor - 2.0 * data_rate_optimization_enabled)))
@@ -80,7 +84,7 @@ fn calculate_lora_airtime(
         phy_payload_len_bytes,
         spreading_factor,
         header_disabled,
-        data_rate_optimization(&bandwidth, &spreading_factor),
+        data_rate_optimization(bandwidth, spreading_factor),
         CodingRate::Cr45,
         is_uplink,
     );
@@ -90,7 +94,8 @@ fn calculate_lora_airtime(
 
 /// Lookup whether or not the Low Data Rate Optimizer is used.
 /// As described in chapter 4.1.2 "LoRaWAN® Regional Parameters RP002-1.0.4".
-fn data_rate_optimization(bandwidth: &Bandwidth, spreading_factor: &SpreadingFactor) -> bool {
+#[allow(clippy::match_same_arms)]
+fn data_rate_optimization(bandwidth: Bandwidth, spreading_factor: SpreadingFactor) -> bool {
     match (bandwidth, spreading_factor) {
         (Bandwidth::Bw125, SpreadingFactor::SF7) => false,
         (Bandwidth::Bw125, SpreadingFactor::SF8) => false,
@@ -116,6 +121,18 @@ fn is_uplink(modulation_info: &LoraModulationInfo) -> bool {
     !modulation_info.polarization_inversion
 }
 
+/// Calculates the maximum airtime the downlink.
+///
+/// Returns the airtime of the item with the longest airtime of the downlink frame.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - the downlink does not contains any items.
+/// - the physical payload length cannot be converted to [`u32`].
+/// - the modulation info and frequency cannot be extracted by [`extract_modulation_freq_info_from_downlink_tx_info`].
+/// - the [`Bandwidth`] type cannot be created form the [`Bandwidth::try_from_hz`] method.
+/// - the [`SpreadingFactor`] type cannot be created form the [`SpreadingFactor::try_from_hz`] method.
 pub fn calc_max_downlink_airtime(
     downlink: chirpstack_api::gw::DownlinkFrame,
 ) -> Result<(u32, f64), AirtimeCalculationError> {
@@ -163,9 +180,9 @@ mod tests {
     fn calc_airtime() {
         let payload = vec![0xFF; 20];
         let mut modulation = LoraModulationInfo {
-            bandwidth: 125000,
+            bandwidth: 125_000,
             spreading_factor: 7,
-            code_rate_legacy: "".to_string(),
+            code_rate_legacy: String::new(),
             polarization_inversion: false,
             ..LoraModulationInfo::default()
         };
@@ -178,7 +195,7 @@ mod tests {
                 phy_payload: payload,
                 tx_info_legacy: None,
                 tx_info: Some(DownlinkTxInfo {
-                    frequency: 868300000,
+                    frequency: 868_300_000,
                     power: 14,
                     modulation: Some(Modulation {
                         parameters: Some(Parameters::Lora(modulation)),
@@ -190,7 +207,7 @@ mod tests {
             gateway_id: "abc".to_string(),
         };
         let (freq, airtime) = calc_max_downlink_airtime(downlink_frame).unwrap();
-        assert_eq!(freq, 868300000);
-        assert_eq!(airtime, 56.6);
+        assert_eq!(freq, 868_300_000);
+        assert!((airtime - 56.6).abs() < f64::EPSILON);
     }
 }

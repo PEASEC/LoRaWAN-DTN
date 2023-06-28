@@ -135,7 +135,9 @@ async fn listening(_verbose: &bool, config: Config, prefix: &Option<u8>) {
         config.mqtt_port.unwrap(),
     );
     let gateway_id = gateway_ids.iter().next().unwrap().clone();
-    let mut runtime = Runtime::new_with_mqtt_options(mqtt_options).await.unwrap();
+    let mut runtime = Runtime::new_with_mqtt_options(mqtt_options, None)
+        .await
+        .unwrap();
     let (sender, mut receiver) = tokio::sync::mpsc::channel(100);
     let my_callback = Box::new(UplinkCallback { sender });
     runtime
@@ -268,7 +270,9 @@ async fn downlink(
     let gateway_ids = chirpstack_api.request_gateway_ids(100).await.unwrap();
 
     let gateway_id = gateway_ids.iter().next().unwrap().clone();
-    let mut runtime = Runtime::new_with_mqtt_options(mqtt_options).await.unwrap();
+    let mut runtime = Runtime::new_with_mqtt_options(mqtt_options, None)
+        .await
+        .unwrap();
     let (sender, mut receiver) = tokio::sync::mpsc::channel(100);
     let my_callback = Box::new(UplinkCallback { sender });
     runtime
@@ -292,14 +296,15 @@ async fn downlink(
 
     pl_bytes.extend_from_slice(payload.as_bytes());
 
-    let mut item_builder = DownlinkItemBuilder::<downlinks::ImmediatelyClassC>::new()
+    let mut item_builder = DownlinkItemBuilder::<downlinks::ImmediatelyClassC>::new();
+    item_builder
         .phy_payload(pl_bytes)
         //.phy_payload(vec![0xff; 10])
         //.phy_payload("RAK7268-2".as_bytes())
         .frequency(freq)
         .power(14);
     if let Some(dr) = dr {
-        item_builder = item_builder.data_rate(dr);
+        item_builder.data_rate(dr);
     } else {
         item_builder
             .raw_spreading_factor(SpreadingFactor::try_from(sf as u32).unwrap())

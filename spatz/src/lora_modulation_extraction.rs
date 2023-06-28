@@ -1,4 +1,6 @@
-use crate::error::LoRaModulationExtrationError;
+//! Extraction of modulation info from ChirpStack frames.
+
+use crate::error::LoRaModulationExtractionError;
 use chirpstack_api::gw::{modulation, DownlinkTxInfo, LoraModulationInfo, UplinkTxInfo};
 use tracing::error;
 
@@ -13,7 +15,7 @@ use tracing::error;
 /// - there are no LoRa parameters.
 pub fn extract_modulation_freq_info_from_downlink_tx_info(
     tx_info: Option<DownlinkTxInfo>,
-) -> Result<(u32, LoraModulationInfo), LoRaModulationExtrationError> {
+) -> Result<(u32, LoraModulationInfo), LoRaModulationExtractionError> {
     if let Some(tx_info) = tx_info {
         let freq = tx_info.frequency;
         if let Some(modulation) = tx_info.modulation {
@@ -21,17 +23,17 @@ pub fn extract_modulation_freq_info_from_downlink_tx_info(
             {
                 Ok((freq, lora_modulation_info))
             } else {
-                let err = LoRaModulationExtrationError::NoLoRaParameters;
+                let err = LoRaModulationExtractionError::NoLoRaParameters;
                 error!(%err);
                 Err(err)
             }
         } else {
-            let err = LoRaModulationExtrationError::NoModulationInfo;
+            let err = LoRaModulationExtractionError::NoModulationInfo;
             error!(%err);
             Err(err)
         }
     } else {
-        let err = LoRaModulationExtrationError::NoTxInfo;
+        let err = LoRaModulationExtractionError::NoTxInfo;
         error!(%err);
         Err(err)
     }
@@ -47,25 +49,19 @@ pub fn extract_modulation_freq_info_from_downlink_tx_info(
 /// - there are no LoRa parameters.
 pub fn extract_modulation_info_from_uplink_tx_info(
     tx_info: Option<UplinkTxInfo>,
-) -> Result<LoraModulationInfo, LoRaModulationExtrationError> {
+) -> Result<LoraModulationInfo, LoRaModulationExtractionError> {
     if let Some(tx_info) = tx_info {
         if let Some(modulation) = tx_info.modulation {
             if let Some(modulation::Parameters::Lora(lora_modulation_info)) = modulation.parameters
             {
                 Ok(lora_modulation_info)
             } else {
-                let err = LoRaModulationExtrationError::NoLoRaParameters;
-                error!(%err);
-                Err(err)
+                Err(LoRaModulationExtractionError::NoLoRaParameters)
             }
         } else {
-            let err = LoRaModulationExtrationError::NoModulationInfo;
-            error!(%err);
-            Err(err)
+            Err(LoRaModulationExtractionError::NoModulationInfo)
         }
     } else {
-        let err = LoRaModulationExtrationError::NoTxInfo;
-        error!(%err);
-        Err(err)
+        Err(LoRaModulationExtractionError::NoTxInfo)
     }
 }

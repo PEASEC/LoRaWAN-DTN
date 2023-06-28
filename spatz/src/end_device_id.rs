@@ -1,54 +1,64 @@
-use crate::error::TryFromEndpointIdError;
+//! End device ID.
+
+use crate::error::TryFromEndDeviceId;
 use bp7::EndpointID;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
 /// End device ID used to identify network participants.
-#[derive(Debug, Clone, Eq, PartialEq, Copy, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Copy, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct EndDeviceId(pub u32);
 
 impl TryFrom<EndpointID> for EndDeviceId {
-    type Error = TryFromEndpointIdError;
+    type Error = TryFromEndDeviceId;
 
     fn try_from(endpoint_id: EndpointID) -> Result<Self, Self::Error> {
         if let EndpointID::Dtn(_, address) = endpoint_id {
             let inner = u32::from_str(address.node_name())?;
             Ok(EndDeviceId(inner))
         } else {
-            Err(TryFromEndpointIdError::NoDtnAddress)
+            Err(TryFromEndDeviceId::NoDtnAddress)
         }
     }
 }
 
 impl TryFrom<EndDeviceId> for EndpointID {
-    type Error = TryFromEndpointIdError;
+    type Error = bp7::eid::EndpointIdError;
 
     fn try_from(end_device_id: EndDeviceId) -> Result<Self, Self::Error> {
-        Ok(EndpointID::with_dtn(&end_device_id.0.to_string())?)
+        EndpointID::with_dtn(&end_device_id.0.to_string())
     }
 }
 
 /// Managed end device ID used to identify network participants. Only used for end device ids
 /// registered at the Spatz instance. Keeps clear text representation of hash for ease of management.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ManagedEndDeviceId {
+    /// CRC32 hash of the phone number.
     hash: u32,
-    number: String,
+    /// Phone number of the end device.
+    phone_number: String,
 }
 
 impl ManagedEndDeviceId {
+    /// Creates a new [`ManagedEndDevice`].
     pub fn new(number: String) -> Self {
         Self {
             hash: crc32fast::hash(number.as_bytes()),
-            number,
+            phone_number: number,
         }
     }
 
+    /// Returns the hash of the [`ManagedEndDevice`].
     pub fn hash(&self) -> u32 {
         self.hash
     }
-    pub fn number(&self) -> String {
-        self.number.clone()
+
+    /// Returns the phone number of the [`ManagedEndDevice`].
+    pub fn phone_number(&self) -> String {
+        self.phone_number.clone()
     }
 }
 
@@ -62,7 +72,7 @@ impl From<String> for ManagedEndDeviceId {
     fn from(number: String) -> Self {
         ManagedEndDeviceId {
             hash: crc32fast::hash(number.as_bytes()),
-            number,
+            phone_number: number,
         }
     }
 }
@@ -71,7 +81,7 @@ impl From<&String> for ManagedEndDeviceId {
     fn from(number: &String) -> Self {
         ManagedEndDeviceId {
             hash: crc32fast::hash(number.as_bytes()),
-            number: number.to_owned(),
+            phone_number: number.clone(),
         }
     }
 }
@@ -79,7 +89,7 @@ impl From<&String> for ManagedEndDeviceId {
 impl From<u32> for ManagedEndDeviceId {
     fn from(value: u32) -> Self {
         ManagedEndDeviceId {
-            number: "".to_owned(),
+            phone_number: String::new(),
             hash: value,
         }
     }
@@ -88,7 +98,7 @@ impl From<u32> for ManagedEndDeviceId {
 impl From<EndDeviceId> for ManagedEndDeviceId {
     fn from(value: EndDeviceId) -> Self {
         ManagedEndDeviceId {
-            number: "".to_owned(),
+            phone_number: String::new(),
             hash: value.0,
         }
     }
@@ -97,7 +107,7 @@ impl From<EndDeviceId> for ManagedEndDeviceId {
 impl From<&EndDeviceId> for ManagedEndDeviceId {
     fn from(value: &EndDeviceId) -> Self {
         ManagedEndDeviceId {
-            number: "".to_owned(),
+            phone_number: String::new(),
             hash: value.0,
         }
     }

@@ -10,18 +10,18 @@ path = "src/lib.rs"
 
 [dependencies]
 async-trait = "0.1"
-chirpstack_api = "4.1.1"
+chirpstack_api = "4.4.0"
 config = "0.13.2"
 http = "0.2.8"
 prost = "0.11.0"
 rand = "0.8.5"
 reqwest = {version = "0.11.10", features = ["json"]}
-rumqttc = "0.18.0"
+rumqttc = "0.20.0"
 serde = "1.0"
 serde_derive = "1.0.8"
 serde_json = "1.0.81"
 thiserror = "1.0.31"
-tonic = "0.8.2"
+tonic = "0.9.2"
 tokio = {version = "1.19", features = ["full"]}
 tracing = "0.1"
 uuid = {version = "1.1", features = ["v4"]}

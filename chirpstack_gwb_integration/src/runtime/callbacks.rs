@@ -1,6 +1,6 @@
 //! Callback traits and callback storage implementations.
 
-use crate::error::CallbackError;
+use crate::error::CallbackRemoveError;
 use crate::gateway_topics::{CommandType, EventType, ParsedTopic, StateType, TopicType};
 use async_trait::async_trait;
 use core::fmt;
@@ -14,7 +14,7 @@ use uuid::Uuid;
 /// Implement this trait if you want to build a down config callback.
 #[async_trait]
 pub trait CommandConfigCallback: Send + Sync + fmt::Debug {
-    /// The function is called with every incoming message it was registered for.
+    /// This function is called with every incoming message it was registered for.
     async fn dispatch_config_command(
         &self,
         gateway_id: String,
@@ -25,7 +25,7 @@ pub trait CommandConfigCallback: Send + Sync + fmt::Debug {
 /// Implement this trait if you want to build a down command callback.
 #[async_trait]
 pub trait CommandDownCallback: Send + Sync + fmt::Debug {
-    /// The function is called with every incoming message it was registered for.
+    /// This function is called with every incoming message it was registered for.
     async fn dispatch_down_command(
         &self,
         gateway_id: String,
@@ -36,7 +36,7 @@ pub trait CommandDownCallback: Send + Sync + fmt::Debug {
 /// Implement this trait if you want to build a exec command callback.
 #[async_trait]
 pub trait CommandExecCallback: Send + Sync + fmt::Debug {
-    /// The function is called with every incoming message it was registered for.
+    /// This function is called with every incoming message it was registered for.
     async fn dispatch_exec_command(
         &self,
         gateway_id: String,
@@ -47,7 +47,7 @@ pub trait CommandExecCallback: Send + Sync + fmt::Debug {
 /// Implement this trait if you want to build a raw command callback.
 #[async_trait]
 pub trait CommandRawCallback: Send + Sync + fmt::Debug {
-    /// The function is called with every incoming message it was registered for.
+    /// This function is called with every incoming message it was registered for.
     async fn dispatch_raw_command(
         &self,
         gateway_id: String,
@@ -58,7 +58,7 @@ pub trait CommandRawCallback: Send + Sync + fmt::Debug {
 /// Implement this trait if you want to build a stats event callback.
 #[async_trait]
 pub trait EventStatsCallback: Send + Sync + fmt::Debug {
-    /// The function is called with every incoming message it was registered for.
+    /// This function is called with every incoming message it was registered for.
     async fn dispatch_stats_event(
         &self,
         gateway_id: String,
@@ -69,7 +69,7 @@ pub trait EventStatsCallback: Send + Sync + fmt::Debug {
 /// Implement this trait if you want to build a up event callback.
 #[async_trait]
 pub trait EventUpCallback: Send + Sync + fmt::Debug {
-    /// The function is called with every incoming message it was registered for.
+    /// This function is called with every incoming message it was registered for.
     async fn dispatch_up_event(
         &self,
         gateway_id: String,
@@ -80,7 +80,7 @@ pub trait EventUpCallback: Send + Sync + fmt::Debug {
 /// Implement this trait if you want to build a ack event callback.
 #[async_trait]
 pub trait EventAckCallback: Send + Sync + fmt::Debug {
-    /// The function is called with every incoming message it was registered for.
+    /// This function is called with every incoming message it was registered for.
     async fn dispatch_ack_event(
         &self,
         gateway_id: String,
@@ -91,7 +91,7 @@ pub trait EventAckCallback: Send + Sync + fmt::Debug {
 /// Implement this trait if you want to build a exec event callback.
 #[async_trait]
 pub trait EventExecCallback: Send + Sync + fmt::Debug {
-    /// The function is called with every incoming message it was registered for.
+    /// This function is called with every incoming message it was registered for.
     async fn dispatch_exec_event(
         &self,
         gateway_id: String,
@@ -102,7 +102,7 @@ pub trait EventExecCallback: Send + Sync + fmt::Debug {
 /// Implement this trait if you want to build a raw event callback.
 #[async_trait]
 pub trait EventRawCallback: Send + Sync + fmt::Debug {
-    /// The function is called with every incoming message it was registered for.
+    /// This function is called with every incoming message it was registered for.
     async fn dispatch_raw_event(
         &self,
         gateway_id: String,
@@ -113,7 +113,7 @@ pub trait EventRawCallback: Send + Sync + fmt::Debug {
 /// Implement this trait if you want to build a conn state callback.
 #[async_trait]
 pub trait StateConnCallback: Send + Sync + fmt::Debug {
-    /// The function is called with every incoming message it was registered for.
+    /// This function is called with every incoming message it was registered for.
     async fn dispatch_conn_state(
         &self,
         gateway_id: String,
@@ -168,7 +168,7 @@ pub struct CallbackStateDrawer {
 }
 
 impl CallbackDrawers {
-    /// Create a new [`CallbackDrawers`] instance with empty [`CallbackCommandDrawer`],
+    /// Creates a new [`CallbackDrawers`] instance with empty [`CallbackCommandDrawer`],
     /// [`CallbackEventDrawer`] and [`CallbackStateDrawer`].
     pub(crate) fn new() -> Self {
         CallbackDrawers {
@@ -178,41 +178,48 @@ impl CallbackDrawers {
         }
     }
 
-    /// Remove the callback with the specified `uuid`.
-    /// # Error
-    /// Returns an error if the callback was not found.
-    pub(crate) fn remove(&mut self, uuid: &Uuid) -> Result<(), CallbackError> {
+    /// Removes a callback by [`Uuid`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no callback with the provided [`Uuid`] is found.
+    pub(crate) fn remove(&mut self, uuid: &Uuid) -> Result<(), CallbackRemoveError> {
         if self.command.remove(uuid).is_ok()
             | self.event.remove(uuid).is_ok()
             | self.state.remove(uuid).is_ok()
         {
             Ok(())
         } else {
-            Err(CallbackError::NoSuchCallback { uuid: *uuid })
+            Err(CallbackRemoveError::NoSuchCallback { uuid: *uuid })
         }
     }
 
+    /// Calls every matching callbacks `dispatch_...` method with the gateway ID and message payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the message payload cannot be decoded into a downlink [`chirpstack_api::gw::DownlinkFrame`].
     #[tracing::instrument]
     pub(crate) async fn dispatch(
         &self,
         topic: ParsedTopic,
         msg_payload: Bytes,
-    ) -> Result<(), CallbackError> {
+    ) -> Result<(), prost::DecodeError> {
         match topic.topic_type {
             TopicType::Event(event_type) => {
                 self.event
                     .dispatch(event_type, topic.gateway_id, msg_payload)
-                    .await?
+                    .await?;
             }
             TopicType::State(state_type) => {
                 self.state
                     .dispatch(state_type, topic.gateway_id, msg_payload)
-                    .await?
+                    .await?;
             }
             TopicType::Command(command_type) => {
                 self.command
                     .dispatch(command_type, topic.gateway_id, msg_payload)
-                    .await?
+                    .await?;
             }
         }
         Ok(())
@@ -220,6 +227,7 @@ impl CallbackDrawers {
 }
 
 impl CallbackCommandDrawer {
+    /// Create [`CallbackCommandDrawer`].
     pub(crate) fn new() -> Self {
         CallbackCommandDrawer {
             config: HashMap::new(),
@@ -229,23 +237,33 @@ impl CallbackCommandDrawer {
         }
     }
 
-    pub(crate) fn remove(&mut self, uuid: &Uuid) -> Result<(), CallbackError> {
+    /// Removes a callback by [`Uuid`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no callback with the provided [`Uuid`] is found.
+    pub(crate) fn remove(&mut self, uuid: &Uuid) -> Result<(), CallbackRemoveError> {
         if self.down.remove(uuid).is_some()
             | self.exec.remove(uuid).is_some()
             | self.raw.remove(uuid).is_some()
         {
             Ok(())
         } else {
-            Err(CallbackError::NoSuchCallback { uuid: *uuid })
+            Err(CallbackRemoveError::NoSuchCallback { uuid: *uuid })
         }
     }
 
+    /// Calls every matching callbacks `dispatch_...` method with the gateway ID and message payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the message payload cannot be decoded into a downlink [`chirpstack_api::gw::DownlinkFrame`].
     pub(crate) async fn dispatch(
         &self,
         command_type: CommandType,
         gateway_id: String,
         msg_payload: Bytes,
-    ) -> Result<(), CallbackError> {
+    ) -> Result<(), prost::DecodeError> {
         match command_type {
             CommandType::Down => {
                 let downlink_frame = chirpstack_api::gw::DownlinkFrame::decode(msg_payload)?;
@@ -306,6 +324,7 @@ impl CallbackCommandDrawer {
 }
 
 impl CallbackEventDrawer {
+    /// Creates a new emtpy [`CallbackEventDrawer`].
     pub(crate) fn new() -> Self {
         CallbackEventDrawer {
             stats: HashMap::new(),
@@ -316,7 +335,12 @@ impl CallbackEventDrawer {
         }
     }
 
-    pub(crate) fn remove(&mut self, uuid: &Uuid) -> Result<(), CallbackError> {
+    /// Removes a callback by [`Uuid`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no callback with the provided [`Uuid`] is found.
+    pub(crate) fn remove(&mut self, uuid: &Uuid) -> Result<(), CallbackRemoveError> {
         if self.stats.remove(uuid).is_some()
             | self.up.remove(uuid).is_some()
             | self.ack.remove(uuid).is_some()
@@ -325,16 +349,21 @@ impl CallbackEventDrawer {
         {
             Ok(())
         } else {
-            Err(CallbackError::NoSuchCallback { uuid: *uuid })
+            Err(CallbackRemoveError::NoSuchCallback { uuid: *uuid })
         }
     }
 
+    /// Calls every matching callbacks `dispatch_...` method with the gateway ID and message payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the message payload cannot be decoded into a downlink [`chirpstack_api::gw::DownlinkFrame`].
     pub(crate) async fn dispatch(
         &self,
         event_type: EventType,
         gateway_id: String,
         msg_payload: Bytes,
-    ) -> Result<(), CallbackError> {
+    ) -> Result<(), prost::DecodeError> {
         match event_type {
             EventType::Stats => {
                 let gateway_stats = chirpstack_api::gw::GatewayStats::decode(msg_payload)?;
@@ -408,26 +437,37 @@ impl CallbackEventDrawer {
 }
 
 impl CallbackStateDrawer {
+    /// Creates a new emtpy [`CallbackStateDrawer`].
     pub(crate) fn new() -> Self {
         CallbackStateDrawer {
             conn: HashMap::new(),
         }
     }
 
-    pub(crate) fn remove(&mut self, uuid: &Uuid) -> Result<(), CallbackError> {
+    /// Removes a callback by [`Uuid`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no callback with the provided [`Uuid`] is found.
+    pub(crate) fn remove(&mut self, uuid: &Uuid) -> Result<(), CallbackRemoveError> {
         if self.conn.remove(uuid).is_some() {
             Ok(())
         } else {
-            Err(CallbackError::NoSuchCallback { uuid: *uuid })
+            Err(CallbackRemoveError::NoSuchCallback { uuid: *uuid })
         }
     }
 
+    /// Calls every matching callbacks `dispatch_...` method with the gateway ID and message payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the message payload cannot be decoded into a downlink [`chirpstack_api::gw::DownlinkFrame`].
     pub(crate) async fn dispatch(
         &self,
         state_type: StateType,
         gateway_id: String,
         msg_payload: Bytes,
-    ) -> Result<(), CallbackError> {
+    ) -> Result<(), prost::DecodeError> {
         match state_type {
             StateType::Conn => {
                 let conn_state = chirpstack_api::gw::ConnState::decode(msg_payload)?;

@@ -29,11 +29,13 @@ const LONG_ENCODING_VALUE: f64 = 180_f64 / 2_i32.pow(23) as f64;
 const ALT_ENCODING_VALUE: f64 = 100_f64;
 
 /// Encode a floating point latitude into a 3 byte singed value.
+#[allow(clippy::cast_possible_truncation)]
 pub fn encode_lat(lat: f64) -> Result<i32, LocationEncodingError> {
     trace!("Encoding latitude from: {lat}");
-    if lat.abs() > 90_f64 || lat == -90_f64 {
+    if lat.abs() > 90_f64 || (lat - -90_f64).abs() < f64::EPSILON {
         Err(LocationEncodingError::LatOutOfRange)
     } else {
+        // Truncation is intended.
         Ok((lat / LAT_ENCODING_VALUE).round() as i32)
     }
 }
@@ -41,15 +43,17 @@ pub fn encode_lat(lat: f64) -> Result<i32, LocationEncodingError> {
 /// Decode a singed 3 byte encoded latitude into a floating point value.
 pub fn decode_lat(lat: i32) -> f64 {
     trace!("Decoding latitude from: {lat}");
-    ((LAT_ENCODING_VALUE * f64::from(lat)) * 100000_f64).round() / 100000_f64
+    ((LAT_ENCODING_VALUE * f64::from(lat)) * 100_000_f64).round() / 100_000_f64
 }
 
 /// Encode a floating point longitude into a 3 byte singed value.
+#[allow(clippy::cast_possible_truncation)]
 pub fn encode_long(long: f64) -> Result<i32, LocationEncodingError> {
     trace!("Encoding longitude from: {long}");
     if long.abs() > 180_f64 {
         Err(LocationEncodingError::LongOutOfRange)
     } else {
+        // Truncation is intended.
         Ok((long / LONG_ENCODING_VALUE).round() as i32)
     }
 }
@@ -57,16 +61,18 @@ pub fn encode_long(long: f64) -> Result<i32, LocationEncodingError> {
 /// Decode a singed 3 byte encoded longitude into a floating point value.
 pub fn decode_long(long: i32) -> f64 {
     trace!("Decoding longitude from: {long}");
-    ((LONG_ENCODING_VALUE * f64::from(long)) * 100000_f64).round() / 100000_f64
+    ((LONG_ENCODING_VALUE * f64::from(long)) * 100_000_f64).round() / 100_000_f64
 }
 
 /// Limit altitude to a max of 41943.00 as 24 bit 2 complement can only hold values between
 /// 8388607 and -8388607. Precision two decimal values (e.g. 4022.53).
+#[allow(clippy::cast_possible_truncation)]
 pub fn encode_alt(alt: f64) -> Result<i32, LocationEncodingError> {
     trace!("Encoding altitude from: {alt}");
     if alt.abs() > 83886_f64 {
         Err(LocationEncodingError::AltOutOfRange)
     } else {
+        // Truncation is intended.
         Ok((alt * ALT_ENCODING_VALUE).round() as i32)
     }
 }
@@ -92,7 +98,7 @@ mod tests {
         let decoded_lat = decode_lat(encoded_lat);
         assert!((lat - decoded_lat).abs() < 0.00001);
 
-        let lat = -58.0124552;
+        let lat = -58.012_455_2;
         let encoded_lat = encode_lat(lat).unwrap();
         let decoded_lat = decode_lat(encoded_lat);
         assert!((lat - decoded_lat).abs() < 0.00001);
@@ -113,10 +119,10 @@ mod tests {
     fn decode_lat_test() {
         let encoded_lat = 2_i32.pow(23);
         let decoded_lat = decode_lat(encoded_lat);
-        assert_eq!(90_f64, decoded_lat);
+        assert!((90_f64 - decoded_lat).abs() < f64::EPSILON);
         let encoded_lat = -(2_i32.pow(23));
         let decoded_lat = decode_lat(encoded_lat);
-        assert_eq!(-90_f64, decoded_lat);
+        assert!((-90_f64 - decoded_lat).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -126,7 +132,7 @@ mod tests {
         let decoded_long = decode_long(encoded_long);
         assert!((long - decoded_long).abs() < 0.00001);
 
-        let long = -150.0124552;
+        let long = -150.012_455_2;
         let encoded_long = encode_long(long).unwrap();
         let decoded_long = decode_long(encoded_long);
         assert!((long - decoded_long).abs() < 0.00001);
@@ -148,10 +154,10 @@ mod tests {
     fn decode_long_test() {
         let encoded_long = 2_i32.pow(23);
         let decoded_long = decode_long(encoded_long);
-        assert_eq!(180_f64, decoded_long);
+        assert!((180_f64 - decoded_long).abs() < f64::EPSILON);
         let encoded_long = -(2_i32.pow(23));
         let decoded_long = decode_long(encoded_long);
-        assert_eq!(-180_f64, decoded_long);
+        assert!((-180_f64 - decoded_long).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -161,7 +167,7 @@ mod tests {
         let decoded_alt = decode_alt(encoded_alt);
         assert!((alt - decoded_alt).abs() < 0.01);
 
-        let alt = -150.0124552;
+        let alt = -150.012_455_2;
         let encoded_alt = encode_alt(alt).unwrap();
         let decoded_alt = decode_alt(encoded_alt);
         assert!((alt - decoded_alt).abs() < 0.01);
@@ -175,7 +181,7 @@ mod tests {
         );
         assert_eq!(
             Err(LocationEncodingError::AltOutOfRange),
-            encode_alt(-11183887_f64)
+            encode_alt(-11_183_887_f64)
         );
     }
 }

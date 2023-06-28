@@ -4,6 +4,7 @@ use crate::error::TopicParsingError;
 
 /// LoRaWAN regions.
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum LoRaWanRegion {
     As923,
@@ -38,7 +39,7 @@ impl TryFrom<&str> for LoRaWanRegion {
             "kr920" => Ok(LoRaWanRegion::Kr920),
             "ru864" => Ok(LoRaWanRegion::Ru864),
             "us915" => Ok(LoRaWanRegion::Us915),
-            "ism2400" => Ok(LoRaWanRegion::As923),
+            "ism2400" => Ok(LoRaWanRegion::Ism2400),
             _ => Err(TopicParsingError::LoRaWanRegion {
                 was: value.to_owned(),
             }),
@@ -48,6 +49,7 @@ impl TryFrom<&str> for LoRaWanRegion {
 
 /// MQTT Topic types
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TopicType {
     Event(EventType),
@@ -71,8 +73,9 @@ impl TryFrom<(&str, &str)> for TopicType {
     }
 }
 
-/// Types of events.
+/// All possible event types.
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum EventType {
     Stats,
@@ -100,8 +103,9 @@ impl TryFrom<&str> for EventType {
     }
 }
 
-/// Types of states.
+/// All possible state types.
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum StateType {
     Conn,
@@ -120,8 +124,9 @@ impl TryFrom<&str> for StateType {
     }
 }
 
-/// Types of commands.
+/// All possible command types.
 #[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum CommandType {
     Down,
@@ -146,7 +151,7 @@ impl TryFrom<&str> for CommandType {
     }
 }
 
-/// The relevant parts of a topic parsed into [`ParsedTopic`].
+/// Parsed topic information.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ParsedTopic {
     /// The region.

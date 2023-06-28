@@ -62,6 +62,15 @@ The OpenAPI spec for Spatz is hosted at `/api.json`.
 
 ## Debugging
 ### API
+
+The API documentation is available at `127.0.0.1:3000/redoc` after starting the Spatz.
+ `/api/config/current/...` returns the currently active configuration. `/api/config/next/...` returns the configuration
+after the next restart and allows to set the configuration for the next restart.
+`/api/stats/...` allows insight in the current Spatz metrics.
+`/api/restart_pending` returns whether the configuration changed and the instance needs a restart
+to apply the new configuration. `/api/restart` allows to restart the Spatz.
+
+#### Examples
 List end device IDs
 ```shell
 curl 127.0.0.1:3000/api/end_devices
@@ -73,6 +82,13 @@ curl -X POST -H 'Content-Type: application/json' -d '{"end_devices": ["1","2","3
 Remove end device IDs
 ```shell
 curl -X DELETE -H 'Content-Type: application/json' -d '{"end_devices": ["1","2","3","4"]}' 127.0.0.1:3000/api/end_devices
+```
+
+## Development
+The Spatz requires a Sqlite database as specified in the `spatz/.env` file.
+To create a database file, run the following command in the workspace root:
+```shell
+sqlx database setup -D sqlite://spatz/spatz_db_dev.sqlite --source spatz/migrations
 ```
 
 
